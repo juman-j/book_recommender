@@ -2,7 +2,6 @@
 Main module
 
 This module accumulates all the basic code of this application. 
-
 The key steps are:
 1) FastAPI initialization  
 2) specification of all the functions in which the data preparation and transformation is performed
@@ -21,18 +20,24 @@ app = FastAPI()
 
 templates = Jinja2Templates(directory="template")
 
-
-@app.get(settings.main_url)
-async def book_selection(request: Request):
-    return templates.TemplateResponse("book_selection.html", {"request": request})
+if settings.main_url is not None:
+    @app.get(settings.main_url)
+    async def book_selection(request: Request):
+        """
+        An endpoint that takes the title of the book and its author
+        """
+        return templates.TemplateResponse("book_selection.html", {"request": request})
 
 
 @app.post("/recommendations")
 async def get_data(request: Request):
+    """
+    Endpoint on which the recommendation is displayed
+    """
     from_data = await request.form()
     book_title = from_data.get('book_title')
     book_author = from_data.get('book_author')
-    
+
     def read_csv_with_encoding(filename):
         """
         Read a CSV file with auto-detected encoding.
@@ -47,9 +52,9 @@ async def get_data(request: Request):
             data = file.read()
         result = chardet.detect(data)
         encoding = result['encoding']
-        df = pd.read_csv(filename, encoding=encoding, sep=';', on_bad_lines='warn')
+        raw_data = pd.read_csv(filename, encoding=encoding, sep=';', on_bad_lines='warn')
 
-        return df
+        return raw_data
 
 
     def preprocess_read_csv(filename):
@@ -63,17 +68,17 @@ async def get_data(request: Request):
             pandas.DataFrame: The DataFrame.
         """
         try:
-            df = pd.read_csv(filename, encoding='utf-8', sep=';', on_bad_lines='warn')
+            raw_data = pd.read_csv(filename, encoding='utf-8', sep=';')
         except UnicodeDecodeError:
             try:
-                df = pd.read_csv(filename, encoding='latin-1', sep=';', on_bad_lines='warn')
+                raw_data = pd.read_csv(filename, encoding='latin-1', sep=';')
             except UnicodeDecodeError:
-                df = read_csv_with_encoding(filename)
+                raw_data = read_csv_with_encoding(filename)
 
-        return df
+        return raw_data
 
 
-    def preprocess_lowercase(df):
+    def preprocess_lowercase(raw_data):
         """
         Args:
             df (DataFrame): The input dataset.
@@ -81,16 +86,16 @@ async def get_data(request: Request):
         Returns:
             DataFrame: The modified DataFrame with selected columns in lowercase.
         """
-        df = df[df['Book-Rating'] != 0]
+        raw_data = raw_data[raw_data['Book-Rating'] != 0]
 
-        for column in df.columns:
-            if df[column].dtype == 'object':
-                df[column] = df[column].str.lower()
+        for column in raw_data.columns:
+            if raw_data[column].dtype == 'object':
+                raw_data[column] = raw_data[column].str.lower()
 
-        return df
+        return raw_data
 
 
-    def preprocess_followers(df, book_title, book_author):
+    def preprocess_followers(raw_data, book_title, book_author):
         """
         Args:
             df (DataFrame): The input dataset.
@@ -100,17 +105,17 @@ async def get_data(request: Request):
         Returns:
             numpy.ndarray: An array of unique user IDs.
         """
-        readers = df['User-ID'][
-            (df['Book-Title'] == book_title) &
-            (df['Book-Author'].str.contains(book_author))]
+        readers = raw_data['User-ID'][
+            (raw_data['Book-Title'] == book_title) &
+            (raw_data['Book-Author'].str.contains(book_author))]
 
         unique_readers = readers.unique()
-        df = df[['User-ID', 'Book-Rating', 'Book-Title']]
+        raw_data = raw_data[['User-ID', 'Book-Rating', 'Book-Title']]
 
-        return unique_readers, df
+        return unique_readers, raw_data
 
 
-    def preprocess_popular_books(df, followers):
+    def preprocess_popular_books(raw_data, followers):
         """
         Args:
             df (DataFrame): Original dataset.
@@ -120,12 +125,12 @@ async def get_data(request: Request):
             DataFrame: A spreadsheet with user ratings for selected books.
         """
         # Selecting books rated by users who rated the selected book
-        raw_data = df[(df['User-ID'].isin(followers))]
+        subset = raw_data[(raw_data['User-ID'].isin(followers))]
 
         # Books rated more than 7 times
-        popular_books = raw_data.groupby('Book-Title').count().loc[lambda x: x['User-ID'] >= 8]
+        popular_books = subset.groupby('Book-Title').count().loc[lambda x: x['User-ID'] >= 8]
         # back to the dataframe form
-        popular_books = raw_data[raw_data['Book-Title'].isin(popular_books.index)]
+        popular_books = subset[subset['Book-Title'].isin(popular_books.index)]
 
         dataset_for_corr = popular_books.pivot_table(
             index='User-ID',
@@ -174,7 +179,7 @@ async def get_data(request: Request):
         return result
 
 
-    def process(df, book_title, book_author):
+    def process(raw_data, book_title, book_author):
         """
         Preprocesses the input dataframe by applying several preprocessing steps.
 
@@ -198,10 +203,14 @@ async def get_data(request: Request):
         """
         book_title = book_title.lower()
         book_author = book_author.lower()
-        
-        df_preprocessed = df.copy()
+
+        df_preprocessed = raw_data.copy()
         df_preprocessed = preprocess_lowercase(df_preprocessed)
-        unique_readers, df_preprocessed = preprocess_followers(df_preprocessed, book_title, book_author)
+        unique_readers, df_preprocessed = preprocess_followers(
+                                                                df_preprocessed,
+                                                                book_title,
+                                                                book_author
+                                                                )
 
         if unique_readers.size == 0:
             return None
@@ -218,9 +227,9 @@ async def get_data(request: Request):
 
     ratings = preprocess_read_csv('data/BX-Book-Ratings.csv')
     books = preprocess_read_csv('data/BX-Books.csv')
-    df = pd.merge(ratings, books, on=['ISBN'])
+    raw_data = pd.merge(ratings, books, on=['ISBN'])
 
-    recommendations = process(df, book_title, book_author)
+    recommendations = process(raw_data, book_title, book_author)
 
     if recommendations is None:
         return templates.TemplateResponse("book_not_found.html", {"request": request})
@@ -228,5 +237,6 @@ async def get_data(request: Request):
     if recommendations.empty:
         return templates.TemplateResponse("no_recommendations.html", {"request": request})
 
-    return templates.TemplateResponse("recommendations.html", {"request": request, "recommendations": recommendations.head(5)})
-
+    return templates.TemplateResponse("recommendations.html",
+                                      {"request": request,
+                                       "recommendations": recommendations.head(5)})

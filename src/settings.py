@@ -15,6 +15,6 @@ class Settings(BaseSettings):
     """
     Settings class for configuring the application.
     """
-    main_url: str = os.getenv('MAIN_URL')
+    main_url: Optional[str] = os.getenv('MAIN_URL')
 
 settings = Settings()
