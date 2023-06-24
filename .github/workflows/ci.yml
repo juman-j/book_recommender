@@ -50,14 +50,20 @@ jobs:
       needs: [run_tests]
         
       steps:
-        - name: Login to Docker
-          run: echo ${{ secrets.DOCKER_TOKEN }} | docker login -u ${{ secrets.DOCKER_LOGIN }} --password-stdin
-      
-        - uses: actions/checkout@v3
-      
-        - name: Build the Docker image
-          run: docker build -t ${{ vars.DOCKER_PROJECT}}:${GITHUB_REF_NAME} -f Dockerfile .
-      
-        - name: Push image to Azure
-          run: docker push ${{ vars.DOCKER_PROJECT}}:${GITHUB_REF_NAME}
+        - name: Checkout repository
+          uses: actions/checkout@v2
+  
+        - name: Set up Docker
+          uses: docker/setup-docker@v2
+  
+        - name: Build and push Docker image
+          env:
+            REGISTRY: ${{ secrets.AZURE_REGISTRY }}
+            IMAGE_NAME: books
+            REGISTRY_USERNAME: ${{ secrets.AZURE_REGISTRY_NAME }}
+            REGISTRY_PASSWORD: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+          run: |
+            docker build -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
+            docker login $REGISTRY -u $REGISTRY_USERNAME -p $REGISTRY_PASSWORD
+            docker push $REGISTRY/$IMAGE_NAME:${{ github.sha }}
       
