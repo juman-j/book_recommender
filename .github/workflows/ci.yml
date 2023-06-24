@@ -65,5 +65,5 @@ jobs:
           with:
             push: true
             tags: datasentics.azurecr.io/books:${{ github.sha }}
-            file: aspnet-core-dotnet-core/Dockerfile
+            file: Dockerfile
       
