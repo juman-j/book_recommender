@@ -68,10 +68,10 @@ async def get_data(request: Request):
             pandas.DataFrame: The DataFrame.
         """
         try:
-            raw_data = pd.read_csv(filename, encoding='utf-8', sep=';')
+            raw_data = pd.read_csv(filename, encoding='utf-8', sep=';', on_bad_lines='skip')
         except UnicodeDecodeError:
             try:
-                raw_data = pd.read_csv(filename, encoding='latin-1', sep=';')
+                raw_data = pd.read_csv(filename, encoding='latin-1', sep=';', on_bad_lines='skip')
             except UnicodeDecodeError:
                 raw_data = read_csv_with_encoding(filename)
 
