@@ -12,6 +12,6 @@ COPY . /code
 
 # чтобы не использовалось виртуальное окружение, все равно это образ
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --without test
+    && poetry install --without test
 
-CMD poetry run gunicorn src.main:app ----workers 2 --worker-class uvicorn.workers.UvicornWorker  --bind=0.0.0.0:8000 --timeout 420
+CMD ["poetry", "run", "gunicorn", "src.main:app", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind=0.0.0.0:8000"]
