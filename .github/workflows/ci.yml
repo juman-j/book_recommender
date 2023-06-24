@@ -60,10 +60,10 @@ jobs:
           env:
             REGISTRY: ${{ secrets.AZURE_REGISTRY }}
             IMAGE_NAME: books
-            REGISTRY_USERNAME: ${{ secrets.AZURE_REGISTRY_NAME }}
-            REGISTRY_PASSWORD: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+            REGISTRY_USERNAME: ${{ secrets.AZURE_USERNAME }}
+            REGISTRY_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
           run: |
-            docker build -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
-            docker login $REGISTRY -u $REGISTRY_USERNAME -p $REGISTRY_PASSWORD
-            docker push $REGISTRY/$IMAGE_NAME:${{ github.sha }}
+            docker login $REGISTRY -u $REGISTRY_USERNAME -p $REGISTRY_PASSWORD  
+            docker build --tag $REGISTRY/$IMAGE_NAME .
+            docker push $REGISTRY/$IMAGE_NAME
       
