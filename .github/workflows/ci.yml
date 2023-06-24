@@ -53,17 +53,17 @@ jobs:
         - name: Checkout repository
           uses: actions/checkout@v2
   
-        - name: Set up Docker
-          uses: docker/setup-docker@v2
+        - name: 'Docker login'
+          uses: azure/docker-login@v1
+          with:
+            login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+            username: ${{ secrets.REGISTRY_USERNAME }}
+            password: ${{ secrets.REGISTRY_PASSWORD }}
   
-        - name: Build and push Docker image
-          env:
-            REGISTRY: ${{ secrets.AZURE_REGISTRY }}
-            IMAGE_NAME: books
-            REGISTRY_USERNAME: ${{ secrets.AZURE_USERNAME }}
-            REGISTRY_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
-          run: |
-            docker login $REGISTRY -u $REGISTRY_USERNAME -p $REGISTRY_PASSWORD  
-            docker build --tag $REGISTRY/$IMAGE_NAME .
-            docker push $REGISTRY/$IMAGE_NAME
+        - name: Build and push to ACR
+          uses: docker/build-push-action@v2
+          with:
+            push: true
+            tags: datasentics.azurecr.io/books:${{ github.sha }}
+            file: aspnet-core-dotnet-core/Dockerfile
       
